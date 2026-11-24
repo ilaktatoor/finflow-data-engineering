@@ -1,0 +1,184 @@
+# FinFlow local infrastructure.
+#   make up-data  -> PostgreSQL (operational + warehouse), MinIO, FastAPI source simulator
+#   make up-full  -> the above + Airflow + Metabase
+# The lightweight profile (make demo) needs none of this.
+#
+# Every port is bound to 127.0.0.1. Credentials come from .env and are local
+# development placeholders only (see SECURITY.md).
+
+x-finflow-data-env: &finflow-data-env
+  FINFLOW_MODE: data
+  FINFLOW_S3_ENDPOINT: http://minio:9000
+  FINFLOW_S3_ACCESS_KEY: ${MINIO_ROOT_USER:?set in .env}
+  FINFLOW_S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD:?set in .env}
+  FINFLOW_S3_BUCKET: ${FINFLOW_S3_BUCKET:-finflow-lake}
+  FINFLOW_WAREHOUSE_URL: postgresql+psycopg://${WAREHOUSE_DB_USER}:${WAREHOUSE_DB_PASSWORD}@warehouse-db:5432/warehouse
+  FINFLOW_OPS_DB_URL: postgresql+psycopg://${OPS_DB_USER}:${OPS_DB_PASSWORD}@ops-db:5432/operational
+  FINFLOW_SOURCE_API_URL: http://source-api:8000
+
+services:
+  ops-db:
+    image: postgres:17.12-alpine
+    profiles: [data, full]
+    environment:
+      POSTGRES_USER: ${OPS_DB_USER:?set in .env}
+      POSTGRES_PASSWORD: ${OPS_DB_PASSWORD:?set in .env}
+      POSTGRES_DB: operational
+    volumes:
+      - ops-db-data:/var/lib/postgresql/data
+      - ./sql/operational/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    ports: ["127.0.0.1:5433:5432"]
+    networks: [sources]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d operational"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  warehouse-db:
+    image: postgres:17.12-alpine
+    profiles: [data, full]
+    environment:
+      POSTGRES_USER: ${WAREHOUSE_DB_USER:?set in .env}
+      POSTGRES_PASSWORD: ${WAREHOUSE_DB_PASSWORD:?set in .env}
+      POSTGRES_DB: warehouse
+      AIRFLOW_DB_PASSWORD: ${AIRFLOW_DB_PASSWORD:?set in .env}
+      METABASE_DB_PASSWORD: ${METABASE_DB_PASSWORD:?set in .env}
+      ANALYTICS_READER_PASSWORD: ${ANALYTICS_READER_PASSWORD:?set in .env}
+    volumes:
+      - warehouse-db-data:/var/lib/postgresql/data
+      - ./infrastructure/postgres/warehouse-init.sh:/docker-entrypoint-initdb.d/01-init.sh:ro
+    ports: ["127.0.0.1:5434:5432"]
+    networks: [warehouse]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d warehouse"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  minio:
+    # MinIO stopped publishing community images in 2025. This is a community
+    # build of upstream MinIO, pinned to a release. See docs/adr/0002-minio-object-storage.md.
+    image: pgsty/minio:RELEASE.2026-08-04T00-00-00Z
+    profiles: [data, full]
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?set in .env}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?set in .env}
+    volumes:
+      - minio-data:/data
+    ports: ["127.0.0.1:9000:9000", "127.0.0.1:9001:9001"]
+    networks: [warehouse]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:9000/minio/health/live || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  source-api:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/finflow.Dockerfile
+    image: finflow-app:local
+    profiles: [data, full]
+    environment:
+      FINFLOW_LANDING_DIR: /opt/finflow/data/landing
+      # The root filesystem is read-only; the CLI's log directory goes to tmpfs.
+      FINFLOW_DATA_DIR: /tmp/finflow
+    volumes:
+      # Mount ./data, not ./data/landing: `clean-generated` deletes and recreates
+      # landing/, and a bind mount would keep pointing at the deleted directory.
+      - ./data:/opt/finflow/data:ro
+    ports: ["127.0.0.1:8000:8000"]
+    networks: [sources]
+    read_only: true
+    tmpfs: [/tmp]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  airflow:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/airflow.Dockerfile
+    image: finflow-airflow:local
+    profiles: [full]
+    user: "${AIRFLOW_UID:-50000}:0"
+    # `standalone` runs api-server, scheduler, dag-processor and triggerer in one
+    # container with LocalExecutor: fine for a laptop, not for production.
+    command: >
+      bash -c 'printf "{\"admin\": \"%s\"}" "$$AIRFLOW_ADMIN_PASSWORD" > /tmp/simple_auth_passwords.json
+      && airflow db migrate && exec airflow standalone'
+    environment:
+      <<: *finflow-data-env
+      FINFLOW_HOME: /opt/finflow
+      FINFLOW_DATA_DIR: /opt/finflow/data
+      AIRFLOW_ADMIN_PASSWORD: ${AIRFLOW_ADMIN_PASSWORD:?set in .env}
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:${AIRFLOW_DB_PASSWORD}@warehouse-db:5432/airflow
+      AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_USERS: admin:admin
+      AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_PASSWORDS_FILE: /tmp/simple_auth_passwords.json
+      AIRFLOW__LOGGING__BASE_LOG_FOLDER: /opt/airflow/logs
+      _AIRFLOW_DB_MIGRATE: "true"
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags:ro
+      - ./airflow/logs:/opt/airflow/logs
+      - ./data:/opt/finflow/data
+    ports: ["127.0.0.1:8080:8080"]
+    networks: [sources, warehouse]
+    depends_on:
+      warehouse-db: {condition: service_healthy}
+      ops-db: {condition: service_healthy}
+      minio: {condition: service_healthy}
+      source-api: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://localhost:8080/api/v2/monitor/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 60s
+    restart: unless-stopped
+
+  metabase:
+    image: metabase/metabase:v0.65.7
+    profiles: [full]
+    environment:
+      MB_DB_TYPE: postgres
+      MB_DB_DBNAME: metabase
+      MB_DB_PORT: 5432
+      MB_DB_USER: metabase
+      MB_DB_PASS: ${METABASE_DB_PASSWORD:?set in .env}
+      MB_DB_HOST: warehouse-db
+      MB_ANON_TRACKING_ENABLED: "false"
+      MB_CHECK_FOR_UPDATES: "false"
+      JAVA_OPTS: -Xmx768m
+    ports: ["127.0.0.1:3000:3000"]
+    networks: [warehouse]
+    depends_on:
+      warehouse-db: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:3000/api/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 90s
+    restart: unless-stopped
+
+# Two networks: source systems and the analytical side. Only Airflow (the
+# pipeline) joins both, the way a real pipeline host bridges the two zones.
+networks:
+  sources:
+  warehouse:
+
+volumes:
+  ops-db-data:
+  warehouse-db-data:
+  minio-data:
