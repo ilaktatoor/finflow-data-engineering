@@ -227,6 +227,46 @@ From the default demo (seed 42, small profile + 2 incremental days):
 These numbers describe synthetic data generated to exercise the pipeline;
 they carry no business meaning.
 
+## Screenshots
+
+Captured from a local run of the full profile (`make up-full && make demo-data && make metabase-setup`).
+All data shown is synthetic.
+
+### Metabase dashboard
+
+![FinFlow overview dashboard in Metabase: volume, category value, failure rate, currency mix, customers, loans](docs/screenshots/metabase-dashboard.png)
+
+![Lower half of the dashboard: rejected records by rule and pipeline step durations](docs/screenshots/metabase-dashboard-quality.png)
+
+### Airflow
+
+![The three FinFlow DAGs in Airflow](docs/screenshots/airflow-dags.png)
+
+![Airflow home: component health and run history](docs/screenshots/airflow-overview.png)
+
+**Daily incremental run** — simulate a business day, seed the operational database, ingest, validate, transform, load, ELT:
+
+![Successful runs of finflow_daily_incremental](docs/screenshots/airflow-daily-run.png)
+
+**Rehearsed failure and recovery** — the red run was triggered with `fail_at=load` (3 attempts, nothing committed); the green run recovered the batch from Bronze:
+
+![finflow_reprocess failing with fail_at=load, then recovering](docs/screenshots/airflow-failure-recovery.png)
+
+### MinIO data lake
+
+![MinIO bucket list with finflow-lake](docs/screenshots/minio-buckets.png)
+
+![finflow-lake bucket with bronze, rejected, reports and silver prefixes](docs/screenshots/minio-lake.png)
+
+### Source API simulator (FastAPI / Swagger)
+
+| Merchants | Exchange rates |
+|---|---|
+| ![GET /merchants parameters](docs/screenshots/source-api-merchants-params.png) | ![GET /exchange-rates parameters](docs/screenshots/source-api-exchange-rates-params.png) |
+| ![GET /merchants paginated response](docs/screenshots/source-api-merchants-response.png) | ![GET /exchange-rates paginated response](docs/screenshots/source-api-exchange-rates-response.png) |
+
+![GET /health](docs/screenshots/source-api-health.png)
+
 ## Testing strategy
 
 Unit tests for every rejection reason, money rounding, generator determinism
