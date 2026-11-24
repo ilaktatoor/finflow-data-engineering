@@ -1,0 +1,42 @@
+[
+  {
+    "name": "Daily transaction volume",
+    "display": "line",
+    "sql": "SELECT full_date, transactions, failed FROM mart_daily_transactions ORDER BY full_date"
+  },
+  {
+    "name": "Completed value by merchant category (MXN)",
+    "display": "bar",
+    "sql": "SELECT category, completed_mxn_minor / 100 AS completed_mxn FROM mart_category_volume ORDER BY value_rank"
+  },
+  {
+    "name": "Failure rate by day (%)",
+    "display": "line",
+    "sql": "SELECT full_date, failure_pct FROM mart_daily_transactions ORDER BY full_date"
+  },
+  {
+    "name": "Transactions by currency",
+    "display": "pie",
+    "sql": "SELECT currency_code, transactions FROM mart_currency_distribution"
+  },
+  {
+    "name": "Top 10 customers by activity",
+    "display": "table",
+    "sql": "SELECT activity_rank, customer_id, customer_name, current_segment, transactions, gross_mxn_minor / 100 AS gross_mxn FROM mart_customer_activity ORDER BY activity_rank, customer_id LIMIT 10"
+  },
+  {
+    "name": "Loan repayments by month",
+    "display": "bar",
+    "sql": "SELECT CAST(year AS TEXT) || '-' || LPAD(CAST(month AS TEXT), 2, '0') AS month, on_time, late, missed FROM mart_loan_repayments ORDER BY year, month"
+  },
+  {
+    "name": "Rejected records by rule",
+    "display": "row",
+    "sql": "SELECT rule_name, failed_records FROM mart_data_quality_rules WHERE failed_records > 0 ORDER BY failed_records DESC"
+  },
+  {
+    "name": "Pipeline step duration (ms)",
+    "display": "table",
+    "sql": "SELECT pipeline, step, executions, failures, avg_ms, max_ms FROM mart_pipeline_performance ORDER BY pipeline, step"
+  }
+]
