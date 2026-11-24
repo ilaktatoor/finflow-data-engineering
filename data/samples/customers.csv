@@ -1,0 +1,6 @@
+customer_id,first_name,last_name,email,city,state,segment,created_at,updated_at
+C00001,Pedro,Palacios,customer00001@example.test,San Serafín los altos,Puebla,RETAIL,2021-01-31T14:43:45Z,2021-01-31T14:43:45Z
+C00002,Israel,Avilés,customer00002@example.test,Vieja Zimbabwe,Yucatán,RETAIL,2024-05-27T13:20:39Z,2024-05-27T13:20:39Z
+C00003,Alta  Gracia,Robles,customer00003@example.test,San Omar los bajos,Querétaro,RETAIL,2024-12-25T22:02:56Z,2024-12-25T22:02:56Z
+C00004,Carlos,Caraballo,customer00004@example.test,Vieja Nigeria,Guerrero,RETAIL,2023-05-02T03:24:37Z,2023-05-02T03:24:37Z
+C00005,Lucas,Zarate,customer00005@example.test,San Fernando los altos,Colima,RETAIL,2023-12-20T07:00:07Z,2023-12-20T07:00:07Z

@@ -1,0 +1,37 @@
+[
+ {
+  "merchant_id": "M0001",
+  "merchant_name": "Club Guevara, Peña y Lucio 1",
+  "category": "GROCERIES",
+  "city": "Vieja Qatar",
+  "updated_at": "2025-06-05T00:00:00Z"
+ },
+ {
+  "merchant_id": "M0002",
+  "merchant_name": "Despacho de Anda, Alonzo y Gaitán 2",
+  "category": "RESTAURANTS",
+  "city": "San Ernesto los bajos",
+  "updated_at": "2025-01-11T00:00:00Z"
+ },
+ {
+  "merchant_id": "M0003",
+  "merchant_name": "Vaca y Muñiz S.C. 3",
+  "category": "TRAVEL",
+  "city": "Nueva Finlandia",
+  "updated_at": "2025-11-25T00:00:00Z"
+ },
+ {
+  "merchant_id": "M0004",
+  "merchant_name": "Gracia, Maldonado y León 4",
+  "category": "ELECTRONICS",
+  "city": "San Bruno los altos",
+  "updated_at": "2025-09-20T00:00:00Z"
+ },
+ {
+  "merchant_id": "M0005",
+  "merchant_name": "Palomino A.C. 5",
+  "category": "FUEL",
+  "city": "Nueva Guinea Bissau",
+  "updated_at": "2025-09-02T00:00:00Z"
+ }
+]
