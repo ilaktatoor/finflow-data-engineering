@@ -1,0 +1,44 @@
+# Private working notes (commit plan, progress, handoff) — never published.
+/.local/
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Generated data, lake, warehouse files, reports and logs
+/data/*
+!/data/samples/
+*.duckdb
+*.duckdb.wal
+*.parquet
+*.log
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Notebooks
+.ipynb_checkpoints/
+
+# Airflow runtime files created by the containers
+/airflow/logs/
+/airflow/plugins/
+
+# Editors and OS
+.idea/
+.vscode/
+*.swp
+.DS_Store

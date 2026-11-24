@@ -1,0 +1,62 @@
+# FinFlow pipeline configuration.
+# Environment-specific values (paths, credentials, endpoints) live in `.env`;
+# this file only holds behaviour that is identical on every machine.
+
+[generation]
+seed = 42
+start_date = "2026-01-01"          # first business day of the historical window
+history_days = 30                  # 30 days x 3 foreign currencies = 90 exchange-rate records
+error_rate = 0.05                  # share of transaction records intentionally corrupted
+incremental_min_transactions = 50
+incremental_max_transactions = 100
+
+# Profiles scale every entity proportionally. Transactions never exceed 10,000.
+[generation.profiles.small]
+customers = 100
+accounts = 150
+cards = 120
+merchants = 30
+transactions = 2000
+loans = 50
+loan_payments = 200
+
+[generation.profiles.medium]
+customers = 250
+accounts = 375
+cards = 300
+merchants = 60
+transactions = 5000
+loans = 125
+loan_payments = 500
+
+[generation.profiles.large]
+customers = 500
+accounts = 750
+cards = 600
+merchants = 100
+transactions = 10000
+loans = 250
+loan_payments = 1000
+
+[quality]
+# Critical threshold: a batch whose rejection rate for an entity exceeds this value
+# fails the pipeline before anything is loaded into the warehouse.
+max_reject_rate = 0.10
+# Warning threshold: logged and reported, but the batch still loads.
+warn_reject_rate = 0.02
+# Freshness: maximum allowed gap between the end of the batch window and the
+# newest event in it, in hours.
+max_freshness_lag_hours = 48
+
+[risk]
+# Simulated rules for demonstration only. They are NOT a fraud detection model.
+high_amount_mxn = "50000.00"
+velocity_max_transactions = 3
+velocity_window_minutes = 10
+night_start_hour = 0
+night_end_hour = 5
+
+[logging]
+level = "INFO"
+max_bytes = 1_000_000              # per log file
+backup_count = 3                   # rotated files kept (log retention)
